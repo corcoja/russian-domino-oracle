@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, cast
 from game import Game
 
 START_GAME_TEXT = "Game started!!!"
@@ -17,8 +17,8 @@ def print_commands() -> None:
 
 
 def init_game() -> Game:
-    my_hand = []
-    snake = []
+    my_hand: list[Tuple[int, int]] = []
+    snake: list[Tuple[int, int]] = []
     stock_size = 0
     opponent_hand_size = 0
 
@@ -42,7 +42,7 @@ def init_game() -> Game:
             if not snake or snake[-1][1] == piece[0]:
                 snake.append(piece)
             elif snake[-1][1] == piece[1]:
-                snake.append(piece[::-1])
+                snake.append(cast(Tuple[int, int], piece[::-1]))
             else:
                 raise ValueError()
 
@@ -50,14 +50,16 @@ def init_game() -> Game:
         except ValueError:
             print("Invalid piece numbers! Try again!")
 
-    while (text := input("Enter stock size: ")) is not None:
+    while True:
+        text = input("Enter stock size: ")
         if not text.isnumeric():
             print("Incorrect stock size! Try again!")
             continue
         stock_size = int(text)
         break
 
-    while (text := input("Enter opponent hand size: ")) is not None:
+    while True:
+        text = input("Enter opponent hand size: ")
         if not text.isnumeric():
             print("Incorrect opponent hand size! Try again!")
             continue
@@ -98,7 +100,7 @@ def read_execute_command(game: Game, command: str) -> None:
             raise ValueError("Unknown command!")
 
 
-def parse_piece(piece_text: str) -> Tuple[int, int]:
+def parse_piece(piece_text: str) -> Tuple[int, int] | None:
 
     if len(piece_text) != 2:
         return None
@@ -125,7 +127,8 @@ if __name__ == "__main__":
     print("-" * 32)
     print_commands()
 
-    while (text := input("Enter your command: ")) is not None:
+    while True:
+        text = input("Enter your command: ")
         try:
             read_execute_command(game, text)
         except ValueError:

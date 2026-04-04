@@ -1,5 +1,5 @@
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 
 class Game:
@@ -45,7 +45,7 @@ class Game:
         if not self.__table or self.__table[0][0] == piece[1]:
             self.__table.insert(0, piece)
         elif self.__table[0][0] == piece[0]:
-            self.__table.insert(0, piece[::-1])
+            self.__table.insert(0, tuple(reversed(piece)))  # type: ignore
         else:
             raise ValueError(
                 "Piece numbers are invalid for current leftmost piece in the snake!")
@@ -54,7 +54,7 @@ class Game:
         if not self.__table or self.__table[-1][1] == piece[0]:
             self.__table.append(piece)
         elif self.__table[-1][1] == piece[1]:
-            self.__table.append(piece[::-1])
+            self.__table.append(tuple(reversed(piece)))  # type: ignore
         else:
             raise ValueError(
                 "Piece numbers are invalid for current rightmost piece in the snake!")
@@ -69,7 +69,7 @@ class Game:
         except IndexError as e:
             raise ValueError("Invalid index!") from e
 
-    def opponent_stats(self) -> dict[int: float]:
+    def opponent_stats(self) -> Dict[int, float]:
         return {i: self.__piece_probability(i)
                 for i in range(6 + 1)}
 
