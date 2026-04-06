@@ -125,7 +125,7 @@ class GameState:
         if tile[1] == left_end:
             return tile
         if tile[0] == left_end:
-            return (tile[1], tile[0])
+            return Tile(tile[1], tile[0])
         raise ValueError("Tile does not match left end.")
 
     def _place_on_right(self, tile: Tile) -> Tile:
@@ -136,7 +136,7 @@ class GameState:
         if tile[0] == right_end:
             return tile
         if tile[1] == right_end:
-            return (tile[1], tile[0])
+            return Tile(tile[1], tile[0])
         raise ValueError("Tile does not match right end.")
 
     def _validate_snake(self) -> None:
@@ -185,4 +185,4 @@ class GameState:
         return isinstance(tile, tuple) and len(tile) == 2
 
     def _normalize_tile(self, tile: Tile) -> Tile:
-        return (min(tile[0], tile[1]), max(tile[0], tile[1]))
+        return Tile(min(tile[0], tile[1]), max(tile[0], tile[1]))

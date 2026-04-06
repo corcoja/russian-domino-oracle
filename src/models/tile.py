@@ -1,7 +1,15 @@
 
+from typing import NamedTuple
+
 __all__ = ["Tile", "parse_tile"]
 
-Tile = tuple[int, int]
+
+class Tile(NamedTuple):
+    left_pip: int
+    right_pip: int
+
+    def __str__(self) -> str:
+        return f"{self.left_pip}-{self.right_pip}"
 
 
 def parse_tile(tile_text: str) -> Tile | None:
@@ -14,6 +22,6 @@ def parse_tile(tile_text: str) -> Tile | None:
     right_pip = int(cleaned[1])
 
     if 0 <= left_pip <= 6 and 0 <= right_pip <= 6:
-        return (left_pip, right_pip)
+        return Tile(left_pip, right_pip)
 
     return None
