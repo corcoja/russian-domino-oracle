@@ -46,7 +46,7 @@ class GameMove:
                 if not 0 <= self.hand_index < len(self.player_state.hand):
                     raise ValueError("hand_index is out of range for player's hand.")
                 if HandTile.is_unknown(self.tile) or self.player_state.hand[self.hand_index] != self.tile:
-                    raise ValueError("tile does not match the player's hand at hand_index.")
+                    raise ValueError("Tile does not match the player's hand at hand_index.")
 
             case GameMoveType.OPPONENT_DRAWS_UNKNOWN:
                 if self.player_state.player.id == MAIN_PLAYER_ID:

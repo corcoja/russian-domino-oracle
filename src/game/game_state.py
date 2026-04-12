@@ -73,9 +73,9 @@ class GameState:
             self._validate_exposed_tiles()
             self._validate_player_move_order()
             self._validate_next_player_move()
-        except (ValueError, DuplicateExposedTilesError):
+        except (ValueError, DuplicateExposedTilesError) as exc:
             self._player_states = old_player_states
-            raise
+            raise exc
 
     @property
     def snake(self) -> tuple[HandTile, ...]:
@@ -88,9 +88,9 @@ class GameState:
         try:
             self._validate_snake()
             self._validate_exposed_tiles()
-        except (ValueError, DuplicateExposedTilesError):
+        except (ValueError, DuplicateExposedTilesError) as exc:
             self._snake = old
-            raise
+            raise exc
 
     @property
     def next_player_move(self) -> int:
@@ -130,7 +130,9 @@ class GameState:
 
     @property
     def opponents(self) -> tuple[PlayerState, ...]:
-        """Compatibility alias for solver code; use opponent_player_states in new code."""
+        """
+        Compatibility alias for solver code; use opponent_player_states in new code.
+        """
         return self.opponent_player_states
 
     @property

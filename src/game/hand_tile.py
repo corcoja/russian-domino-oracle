@@ -61,5 +61,25 @@ class HandTile:
             return HandTile.from_value(Tile(tile.right_pip, tile.left_pip))
         return None
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, HandTile):
+            return NotImplemented
+
+        # Both are known tiles - compare normalized versions
+        if isinstance(self.value, Tile) and isinstance(other.value, Tile):
+            return self.value.get_normalized_tile() == other.value.get_normalized_tile()
+
+        # Both are unknown tiles
+        if isinstance(self.value, UnknownTile) and isinstance(other.value, UnknownTile):
+            return True
+
+        # One is Tile, one is UnknownTile
+        return False
+
+    def __hash__(self) -> int:
+        if isinstance(self.value, Tile):
+            return hash(self.value.get_normalized_tile())
+        return hash(self.value)
+
     def __str__(self) -> str:
         return str(self.value)
