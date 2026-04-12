@@ -1,5 +1,6 @@
 from src.game.game_state import GameState
 from src.game.hand_tile import HandTile
+from src.game.penalty_points import compute_hand_penalty_points
 
 PIP_ART: dict[int, tuple[str, str, str]] = {
     0: ("     ", "     ", "     "),
@@ -53,6 +54,9 @@ def format_state_snapshot(game: GameState) -> str:
     else:
         for tile in game.main_player_hand:
             lines.append(f"  - {tile}")
+
+    hand_penalty_points = compute_hand_penalty_points(list(game.main_player_hand))
+    lines.append(f"Your penalty points: {hand_penalty_points}")
 
     lines.append("Snake:")
     lines.append(render_snake(game.snake))
