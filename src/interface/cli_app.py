@@ -36,6 +36,7 @@ class CLIApp:
             print(exc)
             return
 
+        print("\n")
         print(game_title_logo())
 
         self.print_commands()
