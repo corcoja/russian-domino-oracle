@@ -1,7 +1,4 @@
-from pyfiglet import Figlet
-from rich.console import Console
-
-from src.interface.renderer import format_state_snapshot
+from src.interface.renderer import format_end_game_summary, format_state_snapshot, game_title_logo
 from src.game.game_state import GameState, MAIN_PLAYER_ID
 from src.game.game_state_transitions import advance_to_next_player, apply_game_move, main_player_state_has_legal_play
 
@@ -10,10 +7,6 @@ from .setup import init_game
 
 
 class CLIApp:
-
-    def __init__(self, title: str = "Kozel Domino Oracle"):
-        self.title = title
-        self.console = Console()
 
     def print_commands(self) -> None:
         print(
@@ -42,10 +35,7 @@ class CLIApp:
             print(exc)
             return
 
-        # Display the game logo
-        figlet = Figlet(font="big", width=100)
-        logo_text = figlet.renderText(self.title)
-        self.console.print(logo_text, style="bold")
+        print(game_title_logo())
 
         self.print_commands()
         self.print_turn_flow_note()

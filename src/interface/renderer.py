@@ -1,3 +1,5 @@
+from pyfiglet import Figlet
+
 from src.game.game_state import GameState
 from src.game.hand_tile import HandTile
 from src.game.penalty_points import compute_hand_penalty_points
@@ -11,6 +13,11 @@ PIP_ART: dict[int, tuple[str, str, str]] = {
     5: ("*   *", "  *  ", "*   *"),
     6: ("*   *", "*   *", "*   *"),
 }
+
+
+def game_title_logo() -> str:
+    figlet = Figlet(font="big", width=100)
+    return figlet.renderText("Kozel Domino Oracle")
 
 
 def render_tile(tile: HandTile) -> list[str]:
