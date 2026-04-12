@@ -15,6 +15,7 @@ class CLIApp:
             "  lXY       : Current player plays on left with tile XY (example: l46).\n"
             "  rXY       : Current player plays on right with tile XY (example: r46).\n"
             "  p         : Pass (opponents only). Your pass is automatic when no legal move exists.\n"
+            "  end       : End game with summary (allowed only if stock is empty and you have no legal play).\n"
             "  show      : Print current state and ASCII table.\n"
             "  help      : Print this help.\n"
             "  quit      : Exit.\n"
@@ -44,6 +45,9 @@ class CLIApp:
         print(format_state_snapshot(game))
 
         while True:
+            if self._maybe_finish_when_any_hand_empty(game):
+                break
+
             self._try_auto_pass_main_player(game)
             try:
                 text = input("Enter command: ").strip()
@@ -63,6 +67,17 @@ class CLIApp:
                         self.print_commands()
                         self.print_turn_flow_note()
                         continue
+
+                    case ParsedCommandType.END_GAME:
+                        end_game_blockers = self._get_end_game_blockers(game)
+                        if end_game_blockers:
+                            print("Cannot end game yet:")
+                            for blocker in end_game_blockers:
+                                print(f"  - {blocker}")
+                            continue
+
+                        print(format_end_game_summary(game, reason="Manual end game invoked."))
+                        break
 
                     case ParsedCommandType.SHOW:
                         print("\n")
@@ -97,3 +112,28 @@ class CLIApp:
         advance_to_next_player(game)
         print(format_state_snapshot(game))
         return True
+
+    def _maybe_finish_when_any_hand_empty(self, game: GameState) -> bool:
+        empty_hand_players = [
+            player_state.player
+            for player_state in sorted(game.player_states, key=lambda current: current.player.id)
+            if len(player_state.hand) == 0
+        ]
+
+        if not empty_hand_players:
+            return False
+
+        player_text = ", ".join(str(player) for player in empty_hand_players)
+        print(format_end_game_summary(game, reason=f"Player(s) finished hand: {player_text}."))
+        return True
+
+    def _get_end_game_blockers(self, game: GameState) -> list[str]:
+        blockers: list[str] = []
+
+        if game.stock_size > 0:
+            blockers.append(f"Stock is not empty yet (stock size: {game.stock_size}).")
+
+        if main_player_state_has_legal_play(game):
+            blockers.append("You still have at least one legal move on the snake.")
+
+        return blockers

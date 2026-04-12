@@ -68,3 +68,27 @@ def format_state_snapshot(game: GameState) -> str:
     lines.append("Snake:")
     lines.append(render_snake(game.snake))
     return "\n".join(lines)
+
+
+def format_end_game_summary(game: GameState, reason: str) -> str:
+    lines: list[str] = []
+    lines.append("GAME OVER")
+    lines.append(f"Reason: {reason}")
+
+    empty_hands = [
+        player_state.player
+        for player_state in sorted(game.player_states, key=lambda current: current.player.id)
+        if len(player_state.hand) == 0
+    ]
+    if empty_hands:
+        lines.append(f"Player(s) with empty hand: {', '.join(str(player) for player in empty_hands)}")
+    else:
+        lines.append("Player(s) with empty hand: none")
+
+    lines.append("Final hand sizes:")
+    for player_state in sorted(game.player_states, key=lambda current: current.player.id):
+        lines.append(f"  - {player_state.player}: {len(player_state.hand)} tiles")
+
+    hand_penalty_points = compute_hand_penalty_points(list(game.main_player_hand))
+    lines.append(f"Your penalty points: {hand_penalty_points}")
+    return "\n".join(lines)

@@ -14,6 +14,7 @@ class ParsedCommandType(str, Enum):
     QUIT = "quit"
     HELP = "help"
     SHOW = "show"
+    END_GAME = "end_game"
     GAME_MOVE = "game_move"
 
 
@@ -33,6 +34,8 @@ def parse_command(command: str, game: GameState) -> ParsedCommand:
             return ParsedCommand(command_type=ParsedCommandType.HELP)
         case "show":
             return ParsedCommand(command_type=ParsedCommandType.SHOW)
+        case "end":
+            return ParsedCommand(command_type=ParsedCommandType.END_GAME)
         case _:
             return ParsedCommand(command_type=ParsedCommandType.GAME_MOVE, game_move=parse_game_move(text, game))
 
