@@ -36,7 +36,11 @@ class CLIApp:
         )
 
     def run(self) -> None:
-        game = init_game()
+        try:
+            game = init_game()
+        except EOFError as exc:
+            print(exc)
+            return
 
         # Display the game logo
         figlet = Figlet(font="big", width=100)
@@ -51,7 +55,11 @@ class CLIApp:
 
         while True:
             self._try_auto_pass_main_player(game)
-            text = input("Enter command: ").strip()
+            try:
+                text = input("Enter command: ").strip()
+            except EOFError:
+                print("Input ended. Exiting Kozel Domino Oracle.")
+                break
 
             try:
                 parsed_command = parse_command(text, game)

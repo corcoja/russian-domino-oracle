@@ -11,16 +11,16 @@ def init_game() -> GameState:
         print("Initialize current real-life game state")
 
         while True:
-            player_count = read_non_negative_int("Number of players (2-4): ")
+            player_count = _read_non_negative_int("Number of players (2-4): ")
             if 2 <= player_count <= 4:
                 break
             print("Supported player count is 2 to 4.")
 
-        player_move_order = read_player_move_order(player_count)
-        next_player_move = read_next_player_move(player_move_order)
+        player_move_order = _read_player_move_order(player_count)
+        next_player_move = _read_next_player_move(player_move_order)
 
-        main_player_hand = read_tile_list("Enter your current hand:")
-        snake = read_tile_list("Enter snake tiles from left to right:")
+        main_player_hand = _read_tile_list("Enter your current hand:")
+        snake = _read_tile_list("Enter snake tiles from left to right:")
 
         player_states: list[PlayerState] = [
             PlayerState.with_hand_tiles(
@@ -30,7 +30,7 @@ def init_game() -> GameState:
         ]
 
         for player_id in range(1, player_count):
-            tile_count = read_non_negative_int(f"Enter hand size for player {player_id}: ")
+            tile_count = _read_non_negative_int(f"Enter hand size for player {player_id}: ")
             player_states.append(
                 PlayerState.with_hand_tiles(
                     player=Player(id=player_id, name="Opponent"),
@@ -50,21 +50,21 @@ def init_game() -> GameState:
             print("Please re-enter the setup values.\n")
 
 
-def read_non_negative_int(prompt: str) -> int:
+def _read_non_negative_int(prompt: str) -> int:
     while True:
-        raw = input(prompt).strip()
+        raw = _read_input(prompt).strip()
         if raw.isdigit():
             return int(raw)
         print("Please enter a non-negative integer.")
 
 
-def read_tile_list(prompt: str) -> list[HandTile]:
+def _read_tile_list(prompt: str) -> list[HandTile]:
     print(prompt)
     print("Enter one tile per line in XY format (0-6). Press Enter on an empty line when done.")
     tiles: list[HandTile] = []
 
     while True:
-        raw = input().strip()
+        raw = _read_input().strip()
 
         if raw == "":
             return tiles
@@ -78,12 +78,12 @@ def read_tile_list(prompt: str) -> list[HandTile]:
         tiles.append(HandTile.from_value(tile))
 
 
-def read_player_move_order(player_count: int) -> list[int]:
+def _read_player_move_order(player_count: int) -> list[int]:
     expected = set(range(player_count))
     default_order = list(range(player_count))
 
     while True:
-        raw = input(
+        raw = _read_input(
             "Enter player move order as IDs separated by spaces "
             f"({MAIN_PLAYER_ID} is you, IDs must be in range 0..{player_count - 1}. Default is "
             f"\"{' '.join(str(x) for x in default_order)}\"): "
@@ -110,9 +110,9 @@ def read_player_move_order(player_count: int) -> list[int]:
         return order
 
 
-def read_next_player_move(player_move_order: list[int]) -> int:
+def _read_next_player_move(player_move_order: list[int]) -> int:
     while True:
-        raw = input(f"Next player to move ID (Default is \"{MAIN_PLAYER_ID}\", i.e., you): ").strip()
+        raw = _read_input(f"Next player to move ID (Default is \"{MAIN_PLAYER_ID}\", i.e., you): ").strip()
         if raw == "":
             return MAIN_PLAYER_ID
 
@@ -124,3 +124,10 @@ def read_next_player_move(player_move_order: list[int]) -> int:
         if next_player in player_move_order:
             return next_player
         print("Next player must be one of the IDs in the move order.")
+
+
+def _read_input(prompt: str = "") -> str:
+    try:
+        return input(prompt)
+    except EOFError as exc:
+        raise EOFError("Input ended before the setup was complete.") from exc
