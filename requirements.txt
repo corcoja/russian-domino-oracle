@@ -1,2 +1,4 @@
 pyfiglet==1.0.4
-rich==14.3.3
+rich==14.3.4
+pytest==9.0.3
+pytest-cov==7.1.0
