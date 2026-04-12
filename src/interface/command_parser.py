@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from src.models.tile import parse_tile
-from src.models.unknown_tile import UnknownTile
-from src.game.game_state import GameState
+from src.game.game_state import GameState, MAIN_PLAYER_ID
+from src.game.hand_tile import HandTile
+from src.game.tile import Tile
+from src.game.unknown_tile import UnknownTile
 from src.game.game_move import GameMove
 from src.game.game_move_type import GameMoveType
 from src.game.snake_end import SnakeEnd
@@ -42,116 +43,119 @@ def parse_game_move(command: str, game: GameState) -> GameMove:
     if not text:
         raise ValueError("Empty command.")
 
-    text = _normalize_1v1_aliases(text)
+    if game.next_player_move == MAIN_PLAYER_ID:
+        return _parse_main_player_move(text, game)
 
+    return _parse_opponent_turn_move(text, game)
+
+
+def _parse_main_player_move(text: str, game: GameState) -> GameMove:
     try:
-        return _parse_draw_known_command(text, game)
+        return _parse_main_player_draw_command(text, game)
     except ValueError:
         pass
 
     try:
-        return _parse_play_from_hand_command(text, game)
+        return _parse_main_player_play_command(text, game)
     except ValueError:
         pass
 
+    raise ValueError("It is your turn. Use dXY, lXY, or rXY.")
+
+
+def _parse_opponent_turn_move(text: str, game: GameState) -> GameMove:
     try:
-        return _parse_opponent_command(text, game)
-    except ValueError:
-        pass
+        parsed = _parse_current_opponent_move(text, game)
+    except ValueError as exc:
+        raise ValueError(f"It is player {game.next_player_move}'s turn. Use d, lXY, rXY, or p.") from exc
 
-    raise ValueError("Unknown command.")
-
-
-def _normalize_1v1_aliases(text: str) -> str:
-    if text == "x":
-        return "p1x"
-
-    if text.startswith("ol") and len(text) == 4:
-        return f"p1l{text[2:]}"
-
-    if text.startswith("or") and len(text) == 4:
-        return f"p1r{text[2:]}"
-
-    return text
+    return parsed
 
 
-def _parse_draw_known_command(text: str, game: GameState) -> GameMove:
+def _parse_main_player_draw_command(text: str, game: GameState) -> GameMove:
     if not (text.startswith("d") and len(text) == 3):
         raise ValueError("Invalid draw command format.")
 
-    tile = parse_tile(text[1:])
+    tile = Tile.from_string(text[1:])
 
     if tile is None:
         raise ValueError("Invalid draw tile format.")
 
     return GameMove(
-        player=game.main_player,
+        player_state=game.main_player_state,
         move_type=GameMoveType.PLAYER_DRAWS_KNOWN,
-        tile=tile
+        tile=HandTile.from_value(tile)
     )
 
 
-def _parse_play_from_hand_command(text: str, game: GameState) -> GameMove:
+def _parse_main_player_play_command(text: str, game: GameState) -> GameMove:
     if not text or text[0] not in {"l", "r"}:
-        raise ValueError("Invalid play from hand command format.")
+        raise ValueError("Invalid play command format.")
 
     side_char = text[0]
     snake_end = SnakeEnd.LEFT if side_char == "l" else SnakeEnd.RIGHT
 
-    index_text = text[1:]
-    if not index_text.isdigit():
-        raise ValueError(f"Invalid {snake_end.name.lower()} command index.")
+    tile_text = text[1:]
+    parsed_tile = Tile.from_string(tile_text)
+    if parsed_tile is None:
+        raise ValueError(f"Invalid {snake_end.name.lower()} command tile.")
+    tile = HandTile.from_value(parsed_tile)
 
-    hand_index = int(index_text)
-    if hand_index < 0 or hand_index >= len(game.my_hand):
-        raise ValueError(f"Invalid {snake_end.name.lower()} command index.")
+    hand_index = _find_matching_hand_index(game.main_player_hand, tile)
+    if hand_index is None:
+        raise ValueError("You do not have that tile in hand.")
+    hand_tile = game.main_player_hand[hand_index]
 
     return GameMove(
-        player=game.main_player,
+        player_state=game.main_player_state,
         move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
-        tile=game.my_hand[hand_index],
+        tile=HandTile.from_value(hand_tile),
         snake_end=snake_end,
         hand_index=hand_index,
     )
 
 
-def _parse_opponent_command(text: str, game: GameState) -> GameMove:
-    if not (text.startswith("p") and len(text) >= 3):
-        raise ValueError("Invalid opponent command format.")
+def _find_matching_hand_index(hand: tuple[HandTile, ...] | list[HandTile], target: HandTile) -> int | None:
+    normalized_target = target.get_normalized_tile()
+    for index, hand_tile in enumerate(hand):
+        if hand_tile.get_normalized_tile() == normalized_target:
+            return index
+    return None
 
-    if not text[1].isdigit():
-        raise ValueError("Player id is missing.")
 
-    player_id = int(text[1])
+def _parse_current_opponent_move(text: str, game: GameState) -> GameMove:
+    player_state = game.get_player_state_by_id(game.next_player_move)
 
-    if not game.opponent_with_id_exists(player_id):
-        raise ValueError("Unknown non-main player id.")
-
-    if len(text) < 3:
-        raise ValueError("Missing player action.")
-
-    action = text[2]
-    payload = text[3:]
-
-    if action == "x" and payload == "":
+    if text == "d":
         return GameMove(
-            player=game.get_opponent_by_id(player_id),
+            player_state=player_state,
             move_type=GameMoveType.OPPONENT_DRAWS_UNKNOWN,
-            tile=UnknownTile(),
+            tile=HandTile.from_value(UnknownTile()),
         )
 
-    if action in {"l", "r"}:
-        tile = parse_tile(payload)
+    if text == "p":
+        return GameMove(
+            player_state=player_state,
+            move_type=GameMoveType.OPPONENT_PASSES,
+            tile=HandTile.from_value(UnknownTile()),
+        )
+
+    if text.startswith("l") or text.startswith("r"):
+        if len(text) != 3:
+            raise ValueError("Invalid opponent play command format.")
+
+        side_char = text[0]
+        tile = Tile.from_string(text[1:])
         if tile is None:
             raise ValueError("Invalid player tile format.")
 
-        snake_end = SnakeEnd.LEFT if action == "l" else SnakeEnd.RIGHT
+        snake_end = SnakeEnd.LEFT if side_char == "l" else SnakeEnd.RIGHT
 
         return GameMove(
-            player=game.get_opponent_by_id(player_id),
+            player_state=player_state,
             move_type=GameMoveType.OPPONENT_PLAYS_KNOWN,
             snake_end=snake_end,
-            tile=tile,
+            tile=HandTile.from_value(tile),
         )
 
     raise ValueError("Unknown command.")

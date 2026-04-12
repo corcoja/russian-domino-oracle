@@ -1,14 +1,18 @@
-from typing import cast
+from collections.abc import Iterable
 
-from src.models.tile import Tile
-from src.game.game_move import GameMove
-from src.game.game_move_type import GameMoveType
-from src.models.player import HandTile, Player
-from src.game.snake_end import SnakeEnd
+from .hand_tile import HandTile
+from .player_state import PlayerState
 
-__all__ = ["GameState"]
+__all__ = ["GameState", "DuplicateExposedTilesError", "MAIN_PLAYER_ID"]
 
+MAIN_PLAYER_ID = 0
 TOTAL_TILES = 28
+
+
+class DuplicateExposedTilesError(ValueError):
+    """
+    Raised when the same tile appears more than once across known hands and the snake.
+    """
 
 
 class GameState:
@@ -16,173 +20,200 @@ class GameState:
     Tracks a live domino game state for N players.
 
     Designed for a game guide where only one player's hand is fully known.
+
+    ----------
+
+    **Note**: Internal mutable fields (_player_states, _snake, _player_move_order) are stored as tuples rather than
+    lists. This prevents callers from mutating the underlying collections directly after construction; all changes must
+    go through the validated property setters, which enforce invariants and roll back on failure.
     """
 
     def __init__(
         self,
-        main_player: Player,
-        opponents: list[Player],
-        snake: list[Tile],
+        player_states: list[PlayerState],
+        snake: Iterable[HandTile],
+        player_move_order: list[int] | None = None,
+        next_player_move: int | None = None,
     ):
-        if not opponents:
-            raise ValueError("At least 1 opponent is required.")
+        if len(player_states) < 2:
+            raise ValueError("At least 2 player states are required.")
 
-        self.main_player = main_player
-        self.opponents = opponents
-        self.snake = snake
+        self._player_states = tuple(player_states)
+        self._snake = tuple(snake)
 
-        if not self.main_player.is_main_player:
-            raise ValueError("Main player must be marked as main player.")
+        default_order = sorted(player_state.player.id for player_state in self._player_states)
+        self._player_move_order = tuple(player_move_order) if player_move_order is not None else tuple(default_order)
+        self._next_player_move = next_player_move if next_player_move is not None else MAIN_PLAYER_ID
 
-        self._validate_players_unique_ids()
-        self._validate_player_hands()
+        if not self.player_state_with_id_exists(MAIN_PLAYER_ID):
+            raise ValueError("Main player state ID is missing from player states.")
+
+        self._validate_player_state_ids_unique()
+        self._validate_player_state_hands()
         self._validate_stock_size()
         self._validate_snake()
-        self._validate_unique_exposed_tiles()
+        self._validate_exposed_tiles()
+        self._validate_player_move_order()
+        self._validate_next_player_move()
+
+    # --- Read-only structural properties with validation on update ---
 
     @property
-    def all_players(self) -> list[Player]:
-        return [self.main_player, *self.opponents]
+    def player_states(self) -> tuple[PlayerState, ...]:
+        return self._player_states
 
-    def opponent_with_id_exists(self, opponent_id: int) -> bool:
-        return any(opponent.id == opponent_id for opponent in self.opponents)
-
-    def get_opponent_by_id(self, opponent_id: int) -> Player:
-        for opponent in self.opponents:
-            if opponent.id == opponent_id:
-                return opponent
-        raise ValueError("Unknown opponent id.")
+    @player_states.setter
+    def player_states(self, updated_player_states: list[PlayerState]) -> None:
+        old_player_states = self._player_states
+        self._player_states = tuple(updated_player_states)
+        try:
+            self._validate_player_state_ids_unique()
+            self._validate_player_state_hands()
+            self._validate_stock_size()
+            self._validate_exposed_tiles()
+            self._validate_player_move_order()
+            self._validate_next_player_move()
+        except (ValueError, DuplicateExposedTilesError):
+            self._player_states = old_player_states
+            raise
 
     @property
-    def my_hand(self) -> list[Tile]:
-        return cast(list[Tile], self.main_player.hand)
+    def snake(self) -> tuple[HandTile, ...]:
+        return self._snake
+
+    @snake.setter
+    def snake(self, tiles: Iterable[HandTile]) -> None:
+        old = self._snake
+        self._snake = tuple(tiles)
+        try:
+            self._validate_snake()
+            self._validate_exposed_tiles()
+        except (ValueError, DuplicateExposedTilesError):
+            self._snake = old
+            raise
+
+    @property
+    def next_player_move(self) -> int:
+        return self._next_player_move
+
+    @next_player_move.setter
+    def next_player_move(self, value: int) -> None:
+        if value not in self._player_move_order:
+            raise ValueError("next_player_move must be part of player_move_order.")
+        self._next_player_move = value
+
+    @property
+    def main_player_hand(self) -> tuple[HandTile, ...]:
+        return self.main_player_state.hand
+
+    @main_player_hand.setter
+    def main_player_hand(self, tiles: Iterable[HandTile]) -> None:
+        updated_main_player_state = self.main_player_state.with_hand(tuple(tiles))
+        self._replace_player_state(updated_main_player_state)
+
+    @property
+    def player_move_order(self) -> tuple[int, ...]:
+        return self._player_move_order
+
+    # --- Computed properties ---
+
+    @property
+    def main_player_state(self) -> PlayerState:
+        return self.get_player_state_by_id(MAIN_PLAYER_ID)
+
+    @property
+    def opponent_player_states(self) -> tuple[PlayerState, ...]:
+        return tuple(
+            player_state for player_state in self._player_states
+            if player_state.player.id != MAIN_PLAYER_ID
+        )
+
+    @property
+    def opponents(self) -> tuple[PlayerState, ...]:
+        """Compatibility alias for solver code; use opponent_player_states in new code."""
+        return self.opponent_player_states
 
     @property
     def stock_size(self) -> int:
-        tiles_in_hands = sum(len(player.hand) for player in self.all_players)
-        tiles_in_snake = len(self.snake)
+        tiles_in_hands = sum(len(player_state.hand) for player_state in self._player_states)
+        tiles_in_snake = len(self._snake)
         return TOTAL_TILES - tiles_in_hands - tiles_in_snake
 
-    def apply_move(self, game_move: GameMove) -> None:
-        player = game_move.player
+    # --- Lookup helpers ---
 
-        match game_move.move_type:
-            case GameMoveType.PLAYER_DRAWS_KNOWN:
-                self._validate_decrease_stock()
-                player.hand.append(cast(Tile, game_move.tile))
-                return
+    def player_state_with_id_exists(self, player_state_id: int) -> bool:
+        return any(player_state.player.id == player_state_id for player_state in self._player_states)
 
-            case GameMoveType.OPPONENT_DRAWS_UNKNOWN:
-                self._validate_decrease_stock()
-                player.hand.append(game_move.tile)
-                return
+    def get_player_state_by_id(self, player_state_id: int) -> PlayerState:
+        for player_state in self._player_states:
+            if player_state.player.id == player_state_id:
+                return player_state
+        raise ValueError("Unknown player state ID.")
 
-            case GameMoveType.OPPONENT_PLAYS_KNOWN:
-                if not player.hand:
-                    raise ValueError("Opponent hand cannot be empty.")
-                self._place_tile(cast(Tile, game_move.tile), cast(SnakeEnd, game_move.snake_end))
-                player.hand.pop()
-                return
+    def update_player_state_hand(
+        self,
+        player_state_id: int,
+        updated_hand_tiles: Iterable[HandTile]
+    ) -> None:
+        player_state = self.get_player_state_by_id(player_state_id)
+        self._replace_player_state(player_state.with_hand(updated_hand_tiles))
 
-            case GameMoveType.PLAYER_PLAYS_FROM_HAND:
-                if cast(int, game_move.hand_index) >= len(player.hand):
-                    raise ValueError("Invalid hand index.")
+    # --- Internal mutation helpers ---
 
-                hand_index = cast(int, game_move.hand_index)
-                tile = cast(Tile, player.hand.pop(hand_index))
+    def _replace_player_state(self, updated_player_state: PlayerState) -> None:
+        updated_player_states = [
+            updated_player_state
+            if player_state.player.id == updated_player_state.player.id
+            else player_state
+            for player_state in self._player_states
+        ]
+        self.player_states = updated_player_states
 
-                if tile != game_move.tile:
-                    player.hand.insert(hand_index, tile)
-                    raise ValueError("Move tile does not match hand tile at hand_index.")
-
-                try:
-                    self._place_tile(tile, cast(SnakeEnd, game_move.snake_end))
-                except ValueError as exc:
-                    player.hand.insert(hand_index, tile)
-                    raise ValueError("Invalid move for current snake.") from exc
-
-                return
-
-            case _:
-                raise ValueError("Unsupported move type.")
-
-    def _place_tile(self, tile: Tile, side: SnakeEnd) -> None:
-        if side == SnakeEnd.LEFT:
-            oriented = self._place_on_left(tile)
-            self.snake.insert(0, oriented)
-            return
-        if side == SnakeEnd.RIGHT:
-            oriented = self._place_on_right(tile)
-            self.snake.append(oriented)
-            return
-        raise ValueError("Unknown side.")
-
-    def _place_on_left(self, tile: Tile) -> Tile:
-        if not self.snake:
-            return tile
-
-        left_end = self.snake[0][0]
-        if tile[1] == left_end:
-            return tile
-        if tile[0] == left_end:
-            return Tile(tile[1], tile[0])
-        raise ValueError("Tile does not match left end.")
-
-    def _place_on_right(self, tile: Tile) -> Tile:
-        if not self.snake:
-            return tile
-
-        right_end = self.snake[-1][1]
-        if tile[0] == right_end:
-            return tile
-        if tile[1] == right_end:
-            return Tile(tile[1], tile[0])
-        raise ValueError("Tile does not match right end.")
+    # --- Internal validation helpers ---
 
     def _validate_snake(self) -> None:
-        for i in range(len(self.snake) - 1):
-            if self.snake[i][1] != self.snake[i + 1][0]:
+        for i in range(len(self._snake) - 1):
+
+            if self._snake[i][1] != self._snake[i + 1][0]:
                 raise ValueError("Invalid snake: has non-matching adjacent tiles.")
 
-    def _validate_players_unique_ids(self) -> None:
-        player_ids = list(map(lambda player: player.id, self.all_players))
-        if len(player_ids) != len(set(player_ids)):
-            raise ValueError("Player ids must be unique.")
+    def _validate_player_state_ids_unique(self) -> None:
+        player_state_ids = [player_state.player.id for player_state in self._player_states]
+        if len(player_state_ids) != len(set(player_state_ids)):
+            raise ValueError("Player state IDs must be unique.")
 
-    def _validate_player_hands(self) -> None:
-        if not all(map(self._is_known_tile, self.main_player.hand)):
+    def _validate_player_state_hands(self) -> None:
+        if not all(map(HandTile.is_known, self.main_player_state.hand)):
             raise ValueError("Main player hand must contain only known tiles.")
 
-        if any(player.is_main_player for player in self.opponents):
-            raise ValueError("Opponents cannot be marked as main player.")
-
-        if any(map(lambda player: any(map(self._is_known_tile, player.hand)), self.opponents)):
-            raise ValueError("Opponent hands must contain only unknown tiles.")
+        if any(any(HandTile.is_known(tile) for tile in player_state.hand)
+               for player_state in self.opponent_player_states):
+            raise ValueError("Opponent player state hands must contain only unknown tiles.")
 
     def _validate_stock_size(self) -> None:
         if self.stock_size < 0:
             raise ValueError("Too many tiles in player hands for a 28-tile set.")
 
-    def _validate_unique_exposed_tiles(self) -> None:
-        exposed_tiles: list[Tile] = []
+    def _validate_exposed_tiles(self) -> None:
+        exposed_tiles: list[HandTile] = []
 
-        for player in self.all_players:
-            for tile in player.hand:
-                if self._is_known_tile(tile):
-                    exposed_tiles.append(cast(Tile, tile))
+        for player_state in self._player_states:
+            for tile in player_state.hand:
+                if HandTile.is_known(tile):
+                    exposed_tiles.append(tile)
 
-        exposed_tiles.extend(self.snake)
+        exposed_tiles.extend(self._snake)
 
-        normalized_tiles = list(map(self._normalize_tile, exposed_tiles))
+        normalized_tiles = [t.get_normalized_tile() for t in exposed_tiles]
         if len(normalized_tiles) != len(set(normalized_tiles)):
-            raise ValueError("Duplicate exposed tiles found across known hands and snake.")
+            raise DuplicateExposedTilesError("Duplicate exposed tiles found across known hands and snake.")
 
-    def _validate_decrease_stock(self) -> None:
-        if self.stock_size <= 0:
-            raise ValueError("Stock is empty.")
+    def _validate_player_move_order(self) -> None:
+        expected = sorted(player_state.player.id for player_state in self._player_states)
+        provided = sorted(self._player_move_order)
+        if expected != provided:
+            raise ValueError("player_move_order must contain each player id exactly once.")
 
-    def _is_known_tile(self, tile: HandTile) -> bool:
-        return isinstance(tile, tuple) and len(tile) == 2
-
-    def _normalize_tile(self, tile: Tile) -> Tile:
-        return Tile(min(tile[0], tile[1]), max(tile[0], tile[1]))
+    def _validate_next_player_move(self) -> None:
+        if self._next_player_move not in self._player_move_order:
+            raise ValueError("next_player_move must be part of player_move_order.")

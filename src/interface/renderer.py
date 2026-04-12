@@ -1,5 +1,5 @@
 from src.game.game_state import GameState
-from src.models.tile import Tile
+from src.game.hand_tile import HandTile
 
 PIP_ART: dict[int, tuple[str, str, str]] = {
     0: ("     ", "     ", "     "),
@@ -12,7 +12,7 @@ PIP_ART: dict[int, tuple[str, str, str]] = {
 }
 
 
-def render_tile(tile: Tile) -> list[str]:
+def render_tile(tile: HandTile) -> list[str]:
     left, right = tile
     left_grid = PIP_ART[left]
     right_grid = PIP_ART[right]
@@ -24,7 +24,7 @@ def render_tile(tile: Tile) -> list[str]:
     return lines
 
 
-def render_snake(snake: list[Tile]) -> str:
+def render_snake(snake: tuple[HandTile, ...] | list[HandTile]) -> str:
     if not snake:
         return "(no snake)"
 
@@ -40,14 +40,19 @@ def render_snake(snake: list[Tile]) -> str:
 def format_state_snapshot(game: GameState) -> str:
     lines: list[str] = []
     lines.append(f"Stock size: {game.stock_size}")
+    lines.append(f"Move order: {' '.join(str(player_id) for player_id in game.player_move_order)}")
+    next_player_state = game.get_player_state_by_id(game.next_player_move)
+    lines.append(f"Next player to move: {next_player_state.player}")
     lines.append("Players:")
-    lines.append(f"  - P{game.main_player.id} (you): {len(game.main_player.hand)} tiles")
-    for player in sorted(game.opponents, key=lambda current: current.id):
-        lines.append(f"  - P{player.id}: {len(player.hand)} tiles")
+    for player_state in sorted(game.player_states, key=lambda current: current.player.id):
+        lines.append(f"  - {player_state.player}: {len(player_state.hand)} tiles")
 
     lines.append("Your hand:")
-    for idx, tile in enumerate(game.my_hand):
-        lines.append(f"  [{idx}] {tile[0]}{tile[1]}")
+    if not game.main_player_hand:
+        lines.append("  (empty)")
+    else:
+        for tile in game.main_player_hand:
+            lines.append(f"  - {tile}")
 
     lines.append("Snake:")
     lines.append(render_snake(game.snake))
