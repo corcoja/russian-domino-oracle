@@ -37,7 +37,8 @@ def parse_command(command: str, game: GameState) -> ParsedCommand:
         case "end":
             return ParsedCommand(command_type=ParsedCommandType.END_GAME)
         case _:
-            return ParsedCommand(command_type=ParsedCommandType.PLAYER_ACTION, player_action=parse_player_action(text, game))
+            return ParsedCommand(command_type=ParsedCommandType.PLAYER_ACTION,
+                                 player_action=parse_player_action(text, game))
 
 
 def parse_player_action(command: str, game: GameState) -> PlayerAction:

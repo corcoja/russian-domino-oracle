@@ -1,6 +1,8 @@
 from src.interface.renderer import format_end_game_summary, format_state_snapshot, game_title_logo
 from src.game.game_state import GameState, MAIN_PLAYER_ID
-from src.game.game_state_transitions import advance_to_next_player, apply_player_action, main_player_state_has_legal_play
+from src.game.game_state_transitions import (advance_to_next_player,
+                                             apply_player_action,
+                                             main_player_state_has_legal_play)
 
 from .command_parser import ParsedCommandType, parse_command
 from .setup import init_game

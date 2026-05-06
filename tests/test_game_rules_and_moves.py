@@ -21,7 +21,9 @@ from src.game.snake_end import SnakeEnd
 from src.game.tile import Tile
 from src.game.hand_tile import HandTile
 from src.game.unknown_tile import UnknownTile
-from src.game.game_state_transitions import apply_player_action, advance_to_next_player, main_player_state_has_legal_play
+from src.game.game_state_transitions import (apply_player_action,
+                                             advance_to_next_player,
+                                             main_player_state_has_legal_play)
 
 
 # --- Fixtures ---
