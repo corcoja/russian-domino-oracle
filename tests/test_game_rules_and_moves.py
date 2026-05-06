@@ -13,15 +13,15 @@ Tests cover:
 import pytest
 
 from src.game.game_state import GameState, MAIN_PLAYER_ID
-from src.game.game_move import GameMove
-from src.game.game_move_type import GameMoveType
+from src.game.player_action import PlayerAction
+from src.game.player_action_type import PlayerActionType
 from src.game.player import Player
 from src.game.player_state import PlayerState
 from src.game.snake_end import SnakeEnd
 from src.game.tile import Tile
 from src.game.hand_tile import HandTile
 from src.game.unknown_tile import UnknownTile
-from src.game.game_state_transitions import apply_game_move, advance_to_next_player, main_player_state_has_legal_play
+from src.game.game_state_transitions import apply_player_action, advance_to_next_player, main_player_state_has_legal_play
 
 
 # --- Fixtures ---
@@ -202,16 +202,16 @@ class TestTileMatching:
         tile = HandTile(Tile(2, 3))
         tile_index = next(i for i, t in enumerate(game.main_player_hand) if t == tile)
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+            player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
             tile=tile,
             snake_end=SnakeEnd.RIGHT,
             hand_index=tile_index,
         )
 
-        # Apply the move
-        apply_game_move(game, move)
+        # Apply the action
+        apply_player_action(game, player_action)
 
         # Snake should now be [0-2, 2-3]
         assert len(game.snake) == 2
@@ -243,15 +243,15 @@ class TestTileMatching:
         )
 
         tile = HandTile(Tile(3, 5))
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+            player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
             tile=tile,
             snake_end=SnakeEnd.LEFT,
             hand_index=0,
         )
 
-        apply_game_move(game, move)
+        apply_player_action(game, player_action)
 
         # Snake should now have the tile
         assert len(game.snake) == 1
@@ -274,13 +274,13 @@ class TestTurnAdvancement:
         initial_next_player = game.next_player_move
 
         # Main player draws
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_DRAWS_KNOWN,
+            player_action_type=PlayerActionType.PLAYER_DRAWS_KNOWN,
             tile=HandTile(Tile(0, 0)),
         )
 
-        apply_game_move(game, move)
+        apply_player_action(game, player_action)
 
         # Turn should still be same player
         assert game.next_player_move == initial_next_player
@@ -297,15 +297,15 @@ class TestTurnAdvancement:
         tile = next(t for t in game.main_player_hand if t == HandTile(Tile(2, 3)))
         tile_index = next(i for i, t in enumerate(game.main_player_hand) if t == tile)
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+            player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
             tile=tile,
             snake_end=SnakeEnd.RIGHT,
             hand_index=tile_index,
         )
 
-        apply_game_move(game, move)
+        apply_player_action(game, player_action)
 
         # Turn should advance to next player
         assert game.next_player_move == 1
@@ -319,13 +319,13 @@ class TestTurnAdvancement:
         # Set to player 1 (opponent) for the test
         game.next_player_move = 1
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(1),
-            move_type=GameMoveType.OPPONENT_PASSES,
+            player_action_type=PlayerActionType.OPPONENT_PASSES,
             tile=HandTile(UnknownTile()),
         )
 
-        apply_game_move(game, move)
+        apply_player_action(game, player_action)
 
         # Turn should advance
         assert game.next_player_move == 0
@@ -340,14 +340,14 @@ class TestTurnAdvancement:
         # Set to opponent (player 1)
         game.next_player_move = 1
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(1),
-            move_type=GameMoveType.OPPONENT_PASSES,
+            player_action_type=PlayerActionType.OPPONENT_PASSES,
             tile=HandTile(UnknownTile()),
         )
 
         with pytest.raises(ValueError):
-            apply_game_move(game, move)
+            apply_player_action(game, player_action)
 
     def test_turn_order_cycles(self, three_player_game: GameState) -> None:
         """
@@ -384,15 +384,15 @@ class TestHandManagement:
         tile = next(t for t in game.main_player_hand if t == HandTile(Tile(2, 3)))
         tile_index = next(i for i, t in enumerate(game.main_player_hand) if t == tile)
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+            player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
             tile=tile,
             snake_end=SnakeEnd.RIGHT,
             hand_index=tile_index,
         )
 
-        apply_game_move(game, move)
+        apply_player_action(game, player_action)
 
         assert len(game.main_player_hand) == initial_hand_size - 1
         assert len(game.snake) == 2
@@ -405,13 +405,13 @@ class TestHandManagement:
         game = two_player_game
         initial_hand_size = len(game.main_player_hand)
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_DRAWS_KNOWN,
+            player_action_type=PlayerActionType.PLAYER_DRAWS_KNOWN,
             tile=HandTile(Tile(0, 0)),
         )
 
-        apply_game_move(game, move)
+        apply_player_action(game, player_action)
 
         assert len(game.main_player_hand) == initial_hand_size + 1
 
@@ -432,9 +432,9 @@ class TestMoveValidation:
         opponent_state = game.get_player_state_by_id(1)
 
         with pytest.raises(ValueError):
-            GameMove(
+            PlayerAction(
                 player_state=opponent_state,
-                move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+                player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
                 tile=HandTile(Tile(0, 0)),
                 snake_end=SnakeEnd.LEFT,
                 hand_index=0,
@@ -449,9 +449,9 @@ class TestMoveValidation:
         opponent_state = game.get_player_state_by_id(1)
 
         with pytest.raises(ValueError):
-            GameMove(
+            PlayerAction(
                 player_state=opponent_state,
-                move_type=GameMoveType.PLAYER_DRAWS_KNOWN,
+                player_action_type=PlayerActionType.PLAYER_DRAWS_KNOWN,
                 tile=HandTile(Tile(0, 0)),
             )
 
@@ -493,14 +493,14 @@ class TestMoveValidation:
         # Verify stock is empty
         assert game.stock_size == 0
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_DRAWS_KNOWN,
+            player_action_type=PlayerActionType.PLAYER_DRAWS_KNOWN,
             tile=HandTile(Tile(0, 0)),
         )
 
         with pytest.raises(ValueError):
-            apply_game_move(game, move)
+            apply_player_action(game, player_action)
 
 
 # --- TESTS: Edge Cases ---
@@ -537,15 +537,15 @@ class TestEdgeCases:
         )
 
         # 3-3 should be playable on left
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(0),
-            move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+            player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
             tile=HandTile(Tile(3, 3)),
             snake_end=SnakeEnd.LEFT,
             hand_index=0,
         )
 
-        apply_game_move(game, move)
+        apply_player_action(game, player_action)
 
         assert len(game.snake) == 2
 
@@ -558,16 +558,16 @@ class TestEdgeCases:
         tile = next(t for t in game.main_player_hand if t == HandTile(Tile(4, 5)))
         tile_index = next(i for i, t in enumerate(game.main_player_hand) if t == tile)
 
-        move = GameMove(
+        player_action = PlayerAction(
             player_state=game.get_player_state_by_id(MAIN_PLAYER_ID),
-            move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+            player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
             tile=tile,
             snake_end=SnakeEnd.RIGHT,
             hand_index=tile_index,
         )
 
         with pytest.raises(ValueError):
-            apply_game_move(game, move)
+            apply_player_action(game, player_action)
 
 
 # --- TESTS: Legal Play Detection ---
@@ -814,28 +814,29 @@ class TestMultipleMoveSequences:
         game = two_player_game
 
         # Round 1: Main player draws
-        move1 = GameMove(
+        player_action1 = PlayerAction(
             player_state=game.get_player_state_by_id(0),
-            move_type=GameMoveType.PLAYER_DRAWS_KNOWN,
+            player_action_type=PlayerActionType.PLAYER_DRAWS_KNOWN,
             tile=HandTile(Tile(0, 0)),
         )
-        apply_game_move(game, move1)
+
+        apply_player_action(game, player_action1)
         assert game.next_player_move == 0  # Should still be player 0
 
         hand_size_after_draw = len(game.main_player_hand)
 
         # Round 2: Main player plays
         tile_to_play = game.main_player_hand[0]
-        move2 = GameMove(
+        player_action2 = PlayerAction(
             player_state=game.get_player_state_by_id(0),
-            move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+            player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
             tile=tile_to_play,
             snake_end=SnakeEnd.LEFT if 0 in tile_to_play else SnakeEnd.RIGHT,
             hand_index=0,
         )
 
         try:
-            apply_game_move(game, move2)
+            apply_player_action(game, player_action2)
 
             # If play succeeds, turn should advance
             assert game.next_player_move == 1

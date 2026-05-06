@@ -1,7 +1,7 @@
 from typing import cast
 
-from .game_move import GameMove
-from .game_move_type import GameMoveType
+from .player_action import PlayerAction
+from .player_action_type import PlayerActionType
 from .game_state import GameState
 from .hand_tile import HandTile
 from .player_state import PlayerState
@@ -9,42 +9,42 @@ from .snake_end import SnakeEnd
 
 
 __all__ = [
-    "apply_game_move",
+    "apply_player_action",
     "advance_to_next_player",
     "main_player_state_has_legal_play",
 ]
 
 
-def apply_game_move(game: GameState, game_move: GameMove) -> None:
+def apply_player_action(game: GameState, player_action: PlayerAction) -> None:
     should_advance_turn = False
 
-    if game_move.player_state.player.id != game.next_player_move:
-        raise ValueError("The provided move does not match next_player_move.")
+    if player_action.player_state.player.id != game.next_player_move:
+        raise ValueError("The provided action does not match next_player_move.")
 
-    player_state = game.get_player_state_by_id(game_move.player_state.player.id)
+    player_state = game.get_player_state_by_id(player_action.player_state.player.id)
 
-    match game_move.move_type:
-        case GameMoveType.PLAYER_DRAWS_KNOWN:
+    match player_action.player_action_type:
+        case PlayerActionType.PLAYER_DRAWS_KNOWN:
             _validate_stock_not_empty(game)
-            game.main_player_hand = [*game.main_player_hand, game_move.tile]
+            game.main_player_hand = [*game.main_player_hand, player_action.tile]
 
-        case GameMoveType.OPPONENT_DRAWS_UNKNOWN:
+        case PlayerActionType.OPPONENT_DRAWS_UNKNOWN:
             _validate_stock_not_empty(game)
             game.player_states = _player_states_with_updated_hand(
                 game.player_states,
                 player_state.player.id,
-                [*player_state.hand, game_move.tile],
+                [*player_state.hand, player_action.tile],
             )
 
-        case GameMoveType.OPPONENT_PASSES:
+        case PlayerActionType.OPPONENT_PASSES:
             if game.stock_size > 0:
                 raise ValueError("A player can only pass when the stock is empty.")
             should_advance_turn = True
 
-        case GameMoveType.OPPONENT_PLAYS_KNOWN:
+        case PlayerActionType.OPPONENT_PLAYS_KNOWN:
             if not player_state.hand:
                 raise ValueError("Opponent hand cannot be empty.")
-            _place_tile(game, game_move.tile, cast(SnakeEnd, game_move.snake_end))
+            _place_tile(game, player_action.tile, cast(SnakeEnd, player_action.snake_end))
             game.player_states = _player_states_with_updated_hand(
                 game.player_states,
                 player_state.player.id,
@@ -52,16 +52,16 @@ def apply_game_move(game: GameState, game_move: GameMove) -> None:
             )
             should_advance_turn = True
 
-        case GameMoveType.PLAYER_PLAYS_FROM_HAND:
-            hand_index = cast(int, game_move.hand_index)
+        case PlayerActionType.PLAYER_PLAYS_FROM_HAND:
+            hand_index = cast(int, player_action.hand_index)
             if hand_index >= len(game.main_player_hand):
                 raise ValueError("Invalid hand index.")
 
             tile = game.main_player_hand[hand_index]
-            if tile != game_move.tile:
-                raise ValueError("Move tile does not match hand tile at hand_index.")
+            if tile != player_action.tile:
+                raise ValueError("Action tile does not match hand tile at hand_index.")
 
-            side = cast(SnakeEnd, game_move.snake_end)
+            side = cast(SnakeEnd, player_action.snake_end)
 
             # Pre-compute oriented tile and new snake before touching any state. If orientation fails it raises here,
             # nothing has been mutated yet.
@@ -78,7 +78,7 @@ def apply_game_move(game: GameState, game_move: GameMove) -> None:
             should_advance_turn = True
 
         case _:
-            raise ValueError("Unsupported move type.")
+            raise ValueError("Unsupported action type.")
 
     if should_advance_turn:
         advance_to_next_player(game)

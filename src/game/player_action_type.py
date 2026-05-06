@@ -1,11 +1,11 @@
 from enum import Enum
 
 
-class GameMoveType(str, Enum):
+class PlayerActionType(str, Enum):
     """
     Categorizes player actions during the game flow.
 
-    These types distinguish how a move is performed:
+    These types distinguish how a player action is performed:
     - PLAYER_DRAWS_KNOWN: Main player draws and reveals a known tile from stock
     - PLAYER_PLAYS_FROM_HAND: Main player plays from their hand by index
     - OPPONENT_DRAWS_UNKNOWN: Opponent draws an unseen tile from stock

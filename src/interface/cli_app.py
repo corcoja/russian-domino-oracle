@@ -1,6 +1,6 @@
 from src.interface.renderer import format_end_game_summary, format_state_snapshot, game_title_logo
 from src.game.game_state import GameState, MAIN_PLAYER_ID
-from src.game.game_state_transitions import advance_to_next_player, apply_game_move, main_player_state_has_legal_play
+from src.game.game_state_transitions import advance_to_next_player, apply_player_action, main_player_state_has_legal_play
 
 from .command_parser import ParsedCommandType, parse_command
 from .setup import init_game
@@ -85,10 +85,10 @@ class CLIApp:
                         print(format_state_snapshot(game))
                         continue
 
-                    case ParsedCommandType.GAME_MOVE:
-                        if parsed_command.game_move is None:
-                            raise ValueError("Missing game move payload.")
-                        apply_game_move(game, parsed_command.game_move)
+                    case ParsedCommandType.PLAYER_ACTION:
+                        if parsed_command.player_action is None:
+                            raise ValueError("Missing player action payload.")
+                        apply_player_action(game, parsed_command.player_action)
                         print("\n")
                         print(format_state_snapshot(game))
 

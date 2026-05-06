@@ -5,8 +5,8 @@ from src.game.game_state import GameState, MAIN_PLAYER_ID
 from src.game.hand_tile import HandTile
 from src.game.tile import Tile
 from src.game.unknown_tile import UnknownTile
-from src.game.game_move import GameMove
-from src.game.game_move_type import GameMoveType
+from src.game.player_action import PlayerAction
+from src.game.player_action_type import PlayerActionType
 from src.game.snake_end import SnakeEnd
 
 
@@ -15,13 +15,13 @@ class ParsedCommandType(str, Enum):
     HELP = "help"
     SHOW = "show"
     END_GAME = "end_game"
-    GAME_MOVE = "game_move"
+    PLAYER_ACTION = "player_action"
 
 
 @dataclass(frozen=True)
 class ParsedCommand:
     command_type: ParsedCommandType
-    game_move: GameMove | None = None
+    player_action: PlayerAction | None = None
 
 
 def parse_command(command: str, game: GameState) -> ParsedCommand:
@@ -37,22 +37,22 @@ def parse_command(command: str, game: GameState) -> ParsedCommand:
         case "end":
             return ParsedCommand(command_type=ParsedCommandType.END_GAME)
         case _:
-            return ParsedCommand(command_type=ParsedCommandType.GAME_MOVE, game_move=parse_game_move(text, game))
+            return ParsedCommand(command_type=ParsedCommandType.PLAYER_ACTION, player_action=parse_player_action(text, game))
 
 
-def parse_game_move(command: str, game: GameState) -> GameMove:
+def parse_player_action(command: str, game: GameState) -> PlayerAction:
     text = command.strip().lower()
 
     if not text:
         raise ValueError("Empty command.")
 
     if game.next_player_move == MAIN_PLAYER_ID:
-        return _parse_main_player_move(text, game)
+        return _parse_main_player_action(text, game)
 
-    return _parse_opponent_turn_move(text, game)
+    return _parse_opponent_turn_action(text, game)
 
 
-def _parse_main_player_move(text: str, game: GameState) -> GameMove:
+def _parse_main_player_action(text: str, game: GameState) -> PlayerAction:
     try:
         return _parse_main_player_draw_command(text, game)
     except ValueError:
@@ -66,16 +66,16 @@ def _parse_main_player_move(text: str, game: GameState) -> GameMove:
     raise ValueError("It is your turn. Use dXY, lXY, or rXY.")
 
 
-def _parse_opponent_turn_move(text: str, game: GameState) -> GameMove:
+def _parse_opponent_turn_action(text: str, game: GameState) -> PlayerAction:
     try:
-        parsed = _parse_current_opponent_move(text, game)
+        parsed = _parse_current_opponent_action(text, game)
     except ValueError as exc:
         raise ValueError(f"It is player {game.next_player_move}'s turn. Use d, lXY, rXY, or p.") from exc
 
     return parsed
 
 
-def _parse_main_player_draw_command(text: str, game: GameState) -> GameMove:
+def _parse_main_player_draw_command(text: str, game: GameState) -> PlayerAction:
     if not (text.startswith("d") and len(text) == 3):
         raise ValueError("Invalid draw command format.")
 
@@ -84,14 +84,14 @@ def _parse_main_player_draw_command(text: str, game: GameState) -> GameMove:
     if tile is None:
         raise ValueError("Invalid draw tile format.")
 
-    return GameMove(
+    return PlayerAction(
         player_state=game.main_player_state,
-        move_type=GameMoveType.PLAYER_DRAWS_KNOWN,
+        player_action_type=PlayerActionType.PLAYER_DRAWS_KNOWN,
         tile=HandTile.from_value(tile)
     )
 
 
-def _parse_main_player_play_command(text: str, game: GameState) -> GameMove:
+def _parse_main_player_play_command(text: str, game: GameState) -> PlayerAction:
     if not text or text[0] not in {"l", "r"}:
         raise ValueError("Invalid play command format.")
 
@@ -109,9 +109,9 @@ def _parse_main_player_play_command(text: str, game: GameState) -> GameMove:
         raise ValueError("You do not have that tile in hand.")
     hand_tile = game.main_player_hand[hand_index]
 
-    return GameMove(
+    return PlayerAction(
         player_state=game.main_player_state,
-        move_type=GameMoveType.PLAYER_PLAYS_FROM_HAND,
+        player_action_type=PlayerActionType.PLAYER_PLAYS_FROM_HAND,
         tile=HandTile.from_value(hand_tile),
         snake_end=snake_end,
         hand_index=hand_index,
@@ -126,20 +126,20 @@ def _find_matching_hand_index(hand: tuple[HandTile, ...] | list[HandTile], targe
     return None
 
 
-def _parse_current_opponent_move(text: str, game: GameState) -> GameMove:
+def _parse_current_opponent_action(text: str, game: GameState) -> PlayerAction:
     player_state = game.get_player_state_by_id(game.next_player_move)
 
     if text == "d":
-        return GameMove(
+        return PlayerAction(
             player_state=player_state,
-            move_type=GameMoveType.OPPONENT_DRAWS_UNKNOWN,
+            player_action_type=PlayerActionType.OPPONENT_DRAWS_UNKNOWN,
             tile=HandTile.from_value(UnknownTile()),
         )
 
     if text == "p":
-        return GameMove(
+        return PlayerAction(
             player_state=player_state,
-            move_type=GameMoveType.OPPONENT_PASSES,
+            player_action_type=PlayerActionType.OPPONENT_PASSES,
             tile=HandTile.from_value(UnknownTile()),
         )
 
@@ -154,9 +154,9 @@ def _parse_current_opponent_move(text: str, game: GameState) -> GameMove:
 
         snake_end = SnakeEnd.LEFT if side_char == "l" else SnakeEnd.RIGHT
 
-        return GameMove(
+        return PlayerAction(
             player_state=player_state,
-            move_type=GameMoveType.OPPONENT_PLAYS_KNOWN,
+            player_action_type=PlayerActionType.OPPONENT_PLAYS_KNOWN,
             snake_end=snake_end,
             tile=HandTile.from_value(tile),
         )
